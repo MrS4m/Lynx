@@ -1,0 +1,33 @@
+services:
+  lynx:
+    build: .
+    image: lynx:latest
+    container_name: lynx
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      TOKEN: ${TOKEN:?defina TOKEN no arquivo .env (copie de .env.example)}
+      DASH_USER: ${DASH_USER:-}
+      DASH_PASS: ${DASH_PASS:-}
+      TV_KEY: ${TV_KEY:-}
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - lynx-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  lynx-data:

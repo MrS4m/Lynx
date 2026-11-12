@@ -1,0 +1,32 @@
+# Instalador do agente Lynx para Windows (execute o PowerShell como Administrador).
+#   Instalar:    $env:LYNX_TOKEN='seu_token'; irm {{SERVER}}/install.ps1 | iex
+#   Desinstalar: $env:LYNX_ACTION='uninstall'; irm {{SERVER}}/install.ps1 | iex
+# Opcionais: $env:LYNX_NAME (padrao: nome da maquina), $env:LYNX_INTERVAL (padrao: 15 s)
+$ErrorActionPreference = 'Stop'
+$lynxServer = '{{SERVER}}'
+try {
+  $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+  if (-not ([Security.Principal.WindowsPrincipal]$id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw 'Abra o PowerShell como Administrador e rode novamente.'
+  }
+  try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
+  $tmp = Join-Path $env:TEMP 'lynx-agent.ps1'
+  Write-Host "-> Baixando agente de $lynxServer"
+  $wc = New-Object Net.WebClient
+  $wc.Proxy = $null
+  $wc.DownloadFile("$lynxServer/download/lynx-agent.ps1", $tmp)
+  $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $tmp)
+  if ($env:LYNX_ACTION -eq 'uninstall') { $argList += '-Uninstall' }
+  else {
+    $argList += @('-Install', '-Server', $lynxServer)
+    if ($env:LYNX_TOKEN) { $argList += @('-Token', $env:LYNX_TOKEN) }
+    if ($env:LYNX_NAME) { $argList += @('-Name', $env:LYNX_NAME) }
+    if ($env:LYNX_INTERVAL) { $argList += @('-Interval', $env:LYNX_INTERVAL) }
+  }
+  & powershell.exe @argList
+  if ($LASTEXITCODE -ne 0) { throw "Instalacao terminou com erro (codigo $LASTEXITCODE)." }
+} catch {
+  Write-Host "ERRO: $($_.Exception.Message)" -ForegroundColor Red
+} finally {
+  if ($tmp -and (Test-Path $tmp)) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
+}

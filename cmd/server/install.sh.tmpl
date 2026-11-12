@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Instalador do agente Lynx.
+#   Instalar:    curl -fsSL {{SERVER}}/install.sh | sudo TOKEN=seu_token bash
+#   Desinstalar: curl -fsSL {{SERVER}}/install.sh | sudo bash -s -- uninstall
+# Variáveis opcionais: NAME (padrão: hostname), INTERVAL (padrão: 10 s), LOGS (globs extras separados por vírgula)
+set -euo pipefail
+
+SERVER="{{SERVER}}"
+BIN=/usr/local/bin/lynx-agent
+CONF_DIR=/etc/lynx
+UNIT=/etc/systemd/system/lynx-agent.service
+
+[ "$(id -u)" -eq 0 ] || { echo "Execute como root (use sudo)."; exit 1; }
+command -v systemctl >/dev/null || { echo "systemd não encontrado. Rode o binário manualmente (veja o README)."; exit 1; }
+
+if [ "${1:-}" = "uninstall" ]; then
+  systemctl disable --now lynx-agent 2>/dev/null || true
+  rm -f "$UNIT" "$BIN"
+  rm -rf "$CONF_DIR"
+  systemctl daemon-reload
+  echo "Agente removido."
+  exit 0
+fi
+
+TOKEN="${TOKEN:-}"
+[ -n "$TOKEN" ] || { echo "Informe o token:  curl -fsSL $SERVER/install.sh | sudo TOKEN=xxxx bash"; exit 1; }
+NAME="${NAME:-$(hostname)}"
+INTERVAL="${INTERVAL:-10}"
+
+case "$(uname -m)" in
+  x86_64|amd64)  ARCH=amd64 ;;
+  aarch64|arm64) ARCH=arm64 ;;
+  *) echo "Arquitetura não suportada: $(uname -m)"; exit 1 ;;
+esac
+
+echo "→ Baixando agente ($ARCH) de $SERVER"
+TMP="$(mktemp)"
+if command -v curl >/dev/null; then
+  curl -fsSL "$SERVER/download/lynx-agent-linux-$ARCH" -o "$TMP"
+else
+  wget -q -O "$TMP" "$SERVER/download/lynx-agent-linux-$ARCH"
+fi
+install -m 0755 "$TMP" "$BIN"
+rm -f "$TMP"
+
+mkdir -p "$CONF_DIR"
+umask 077
+cat > "$CONF_DIR/agent.env" <<EOF
+AGENT_SERVER=$SERVER
+AGENT_TOKEN=$TOKEN
+AGENT_NAME=$NAME
+AGENT_INTERVAL=$INTERVAL
+AGENT_LOGS=${LOGS:-}
+EOF
+chmod 600 "$CONF_DIR/agent.env"
+umask 022
+
+cat > "$UNIT" <<'EOF'
+[Unit]
+Description=Lynx Agent (monitoramento leve)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/lynx/agent.env
+ExecStart=/usr/local/bin/lynx-agent
+Restart=always
+RestartSec=5
+# Limites para o agente nunca competir com a carga de produção
+Nice=10
+CPUQuota=5%
+MemoryMax=64M
+TasksMax=64
+IOSchedulingClass=idle
+# Endurecimento: o agente só lê /proc e logs, nunca escreve no disco
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now lynx-agent
+sleep 3
+if systemctl is-active --quiet lynx-agent; then
+  echo "✔ Agente ativo como '$NAME'. Ele deve aparecer no painel em alguns segundos."
+else
+  echo "✘ O agente não iniciou. Veja: journalctl -u lynx-agent -n 30 --no-pager"
+  exit 1
+fi

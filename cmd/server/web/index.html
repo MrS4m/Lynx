@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lynx · monitoramento de servidores</title>
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="sky"></div>
+<header class="top">
+  <a class="brand" href="#/">
+    <img src="logo.png" alt="Lynx" width="46" height="46">
+    <span><b>Lynx</b><small>monitoramento de servidores</small></span>
+  </a>
+  <nav class="nav" id="nav">
+    <a href="#/" data-r="">Visão geral</a>
+    <a href="#/alerts" data-r="alerts">Alertas<span id="nav-badge"></span></a>
+    <a href="#/logs" data-r="logs">Logs</a>
+  </nav>
+  <span class="sp"></span>
+  <span class="live" id="live"><i></i><span id="live-t">conectando…</span></span>
+  <button class="btn" data-act="tv">Modo TV</button>
+</header>
+<main id="view"></main>
+<script src="vendor/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

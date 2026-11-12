@@ -1,0 +1,20 @@
+# segredos: nunca versionar
+.env
+*.pem
+*.key
+
+# dados e binários gerados
+data/
+bin/
+dist/
+state.json
+*.log
+lynx-server
+lynx-agent
+lynx-sim
+
+# editor / sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

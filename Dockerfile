@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Lynx: servidor + painel (e os binários do agente, servidos em /download).
 
 FROM golang:1.24-alpine AS build
@@ -15,9 +14,14 @@ RUN go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/lynx-
     done
 
 FROM alpine:3.20
-RUN apk add --no-cache ca-certificates tzdata \
- && addgroup -S lynx && adduser -S -G lynx -u 10001 lynx \
+# Nada aqui baixa pacotes da internet (o build funciona em rede fechada/com firewall):
+# usuário sem privilégios com os comandos do próprio Alpine; certificados e fuso horário
+# vêm da imagem golang do estágio anterior.
+RUN addgroup -S lynx && adduser -S -G lynx -u 10001 lynx \
  && mkdir -p /data && chown lynx:lynx /data
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /usr/local/go/lib/time/zoneinfo.zip /zoneinfo.zip
+ENV ZONEINFO=/zoneinfo.zip
 COPY --from=build /out/lynx-server /app/lynx-server
 COPY --from=build /out/bin /app/bin
 ENV ADDR=:8080 DATA_DIR=/data BIN_DIR=/app/bin
